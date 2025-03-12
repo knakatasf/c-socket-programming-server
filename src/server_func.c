@@ -10,6 +10,15 @@ struct socket_pair open_client_tcp_socket(const int server_port)
 {
     struct socket_pair socks;
     socks.server_sock = socket(PF_INET, SOCK_STREAM, 0);
+
+    int opt = 1;
+    if (setsockopt(socks.server_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
+    {
+        perror("Error setting SO_REUSEADDR");
+        close(socks.server_sock);
+        exit(EXIT_FAILURE);
+    }
+    
     struct sockaddr_in sin;
     memset(&sin, 0, sizeof(sin));
     sin.sin_family = AF_INET;
