@@ -20,7 +20,7 @@ void receive_json_via_tcp(const int);
 
 long receive_packet_trains(const int server_port, const int num_of_packets, const int packet_size);
 
-long receive_packet_train(const int sock, char buffer[], const int packet_size, struct sockaddr_in*);
+long measure_time_for_packet_trains(const int sock, char buffer[], const int packet_size, struct sockaddr_in*);
 
 void send_result(const int server_port, const long result);
 

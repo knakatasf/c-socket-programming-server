@@ -94,7 +94,7 @@ long receive_packet_trains(const int server_port, const int num_of_packets, cons
      * For a certain time, if the socket doesn't receive any packet, stop waiting.
      */
     struct timeval timeout;
-    timeout.tv_sec = (INTER_MEASUREMENT_TIME / 1000000) - 5; // 10 secs
+    timeout.tv_sec = 60; // 60 secs is a resonable value for timeout
     timeout.tv_usec = 0;
     if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0)
     {
@@ -113,86 +113,91 @@ long receive_packet_trains(const int server_port, const int num_of_packets, cons
         close(sock);
         exit(EXIT_FAILURE);
     }
-        
-    //printf("Server is listening on port %d...\n", server_port);
 
-    /* Allocates enough buffer to receive the second train */
-    char* first_buffer = malloc(num_of_packets * packet_size * 32);
-    if (!first_buffer) {
+    /* Allocates enough buffer to receive the packet trains */
+    char* buffer = malloc(packet_size * 2);
+    if (!buffer) {
         perror("Failed to allocate buffer");
         close(sock);
         exit(EXIT_FAILURE);
     }
 
-    /* Allocates enough buffer to receive the second train */
-    char* second_buffer = malloc(num_of_packets * packet_size * 32);
-    if (!second_buffer) {
-        perror("Failed to allocate buffer");
-        close(sock);
-        exit(EXIT_FAILURE);
-    }
+    long time_diff = measure_time_for_packet_trains(sock, buffer, packet_size, &client_addr);
 
-    long first_train_time_duration = receive_packet_train(sock, first_buffer, packet_size, &client_addr);
-    long second_train_time_duration = receive_packet_train(sock, second_buffer, packet_size, &client_addr);
-
-    free(first_buffer);
-    free(second_buffer);
-    
+    free(buffer);
     close(sock);
 
-    /* Return the result only when the server receives BOTH trains */
-    if (first_train_time_duration != -1 && second_train_time_duration != -1)
-    {
-        long diff = labs(first_train_time_duration - second_train_time_duration);
-        //printf("The difference of the reception time between first train and second train: %ld\n", diff);
-        return diff;
-    }
-    else
-    {
-        printf("Failed to received the packet trains.\n");
-        return -1;
-    }
+    return time_diff;
 }
 
 /*
  *  Uses a while loop to indefinitely waiting for a packet to arrive.
  *  Escape the loop when the socket waits for a certain time: timeout without receiving any packet.
  */
-long receive_packet_train(const int sock, char buffer[], const int packet_size, struct sockaddr_in* client_addr_ptr)
+long measure_time_for_packet_trains(const int sock, char buffer[], const int packet_size, struct sockaddr_in* client_addr_ptr)
 {   
     socklen_t addr_len = sizeof(*client_addr_ptr);
-    struct timeval first_packet_time, last_packet_time;
-    int first_packet_received = 0;
+    struct timeval first_packet_time_for_zero_train, last_packet_time_for_zero_train,
+                   first_packet_time_for_random_train, last_packet_time_for_random_train;
+    int first_packet_received_for_zero_train = 0;
+    int first_packet_received_for_random_train = 0;
     int packet_count = 0;
 
-    while (1)
+    /* 
+     * This while loop is for receiving the zero-packet train.
+     * When receiving the first random packet, breaks the loop.
+     */
+    while (1) 
     {
         ssize_t recv_size = recvfrom(sock, buffer, packet_size, 0, (struct sockaddr*)client_addr_ptr, &addr_len);
         if (recv_size > 0)
         {
             packet_count++;
-            gettimeofday(&last_packet_time, NULL); // Always updates the last_packet_time.
-            if (!first_packet_received) // If the socket haven't received any packet yet,
+            /* Checks the first 10 bytes (skip the first 2 bytes since it is for IDs) is 0x0 */
+            if (memcmp(buffer + 2, "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 10) != 0)
             {
-                //printf("First packet of the train received.\n");
-                first_packet_received = 1;
-                first_packet_time = last_packet_time; // Sets the first_packet_time.
+                //printf("Received the first packet of the random-packet train.\n");
+                //printf("Received %d packets so far.\n", packet_count);
+                first_packet_received_for_random_train = 1;
+                gettimeofday(&first_packet_time_for_random_train, NULL);
+                gettimeofday(&last_packet_time_for_random_train, NULL);
+                break; // Breaks the loop, move on to the next while loop
+            }
+
+            gettimeofday(&last_packet_time_for_zero_train, NULL); // Always updates the time for last packet.
+            if (!first_packet_received_for_zero_train) // If this is the first packet of the zero-packet train,
+            {
+                //printf("Received the first packet of the zero-packet train.\n");
+                first_packet_received_for_zero_train = 1;
+                first_packet_time_for_zero_train = last_packet_time_for_zero_train; // Sets the first_packet_time.
             }
         }
-        else if (recv_size == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) // When timeout, break the loop.
+    }
+
+     /* This while loop is for receiving the random-packet train. When the timeout reaches, it breaks the loop. */
+    while (first_packet_received_for_random_train) 
+    {
+        ssize_t recv_size = recvfrom(sock, buffer, packet_size, 0, (struct sockaddr*)client_addr_ptr, &addr_len);
+        if (recv_size > 0)
         {
-            //printf("Receiving packet train timeout. Received %d packets.\n", packet_count);
+            packet_count++;
+            gettimeofday(&last_packet_time_for_random_train, NULL);
+        }
+        else if (recv_size == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))
+        {
+            //printf("Socket timeout reached. Received %d packets in total.\n", packet_count);
             break;
         }
     }
 
-    if (first_packet_received)
+    if (first_packet_received_for_zero_train && first_packet_received_for_random_train)
     {
         /* Need to convert the duration to millisecond */
-        long train_duration = (last_packet_time.tv_sec - first_packet_time.tv_sec) * 1000 + 
-                              (last_packet_time.tv_usec - first_packet_time.tv_usec) / 1000;
-        // printf("Train reception duration: %ld ms. Packet count: %d\n", train_duration, packet_count);
-        return train_duration;
+        long duration_for_zero_train = (last_packet_time_for_zero_train.tv_sec - first_packet_time_for_zero_train.tv_sec) * 1000 + 
+                                       (last_packet_time_for_zero_train.tv_usec - first_packet_time_for_zero_train.tv_usec) / 1000;
+        long duration_for_random_train = (last_packet_time_for_random_train.tv_sec - first_packet_time_for_random_train.tv_sec) * 1000 + 
+                                         (last_packet_time_for_random_train.tv_usec - first_packet_time_for_random_train.tv_usec) / 1000;
+        return labs(duration_for_zero_train - duration_for_random_train);
     }
     else // When the socket receives NO packets
     {
