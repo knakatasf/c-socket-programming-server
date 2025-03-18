@@ -94,7 +94,7 @@ long receive_packet_trains(const int server_port, const int num_of_packets, cons
      * For a certain time, if the socket doesn't receive any packet, stop waiting.
      */
     struct timeval timeout;
-    timeout.tv_sec = 60; // 60 secs is a resonable value for timeout
+    timeout.tv_sec = SOCKET_TIMEOUT; // 60 secs is a resonable value for timeout
     timeout.tv_usec = 0;
     if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0)
     {

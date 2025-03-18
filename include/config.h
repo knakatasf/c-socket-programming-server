@@ -3,6 +3,8 @@
 
 #include <cjson/cJSON.h>
 
+#define SOCKET_TIMEOUT 60 // The timeout for the udp socket to stop listening to the packet train
+
 extern int PRE_TCP_PORT; // The server's port for pre-probing; default 7777
 extern int POST_TCP_PORT; // The server's port for post-probing; default 6666
 extern int CLIENT_UDP_PORT; // The client's port for probing; default 9876
