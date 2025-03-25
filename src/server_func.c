@@ -64,7 +64,7 @@ void receive_json_via_tcp(const int server_port)
 {
     struct socket_pair socks = open_client_tcp_socket(server_port);
     
-    char buffer[4096];
+    char buffer[JSON_DATA_SIZE];
     int byte_received = recv(socks.client_sock, buffer, sizeof(buffer) - 1, 0);
     if (byte_received < 0)
         perror("Error receiving data");
@@ -83,7 +83,7 @@ long receive_packet_trains(const int server_port, const int num_of_packets, cons
     struct sockaddr_in server_addr, client_addr;
     int sock = socket(PF_INET, SOCK_DGRAM, 0);
 
-    int receive_buffer_size = 1024 * 1024 * 1024; // 1024 MB; Sets the socket size enough to receive the two trains.
+    int receive_buffer_size = RECEIVE_SOCK_SIZE; 
     if (setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &receive_buffer_size, sizeof(receive_buffer_size)) < 0)
     {
         perror("Failed to set receive buffer size");

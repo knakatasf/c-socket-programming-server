@@ -3,7 +3,9 @@
 
 #include <cjson/cJSON.h>
 
+#define JSON_DATA_SIZE 4096 
 #define SOCKET_TIMEOUT 60 // The timeout for the udp socket to stop listening to the packet train
+#define RECEIVE_SOCK_SIZE 1024 * 1024 * 1024 // 1024 MB; Sets the socket size enough to receive the two trains.
 
 extern int PRE_TCP_PORT; // The server's port for pre-probing; default 7777
 extern int POST_TCP_PORT; // The server's port for post-probing; default 6666
