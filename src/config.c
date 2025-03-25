@@ -11,6 +11,7 @@ int SERVER_UDP_PORT;
 int UNCORP_TCP_HEAD;
 int UNCORP_TCP_TAIL;
 
+char CLIENT_IP[17];
 char SERVER_IP[17];
 
 int UDP_SIZE;
@@ -34,8 +35,12 @@ void load_config(const char* json_data)
     UNCORP_TCP_HEAD = cJSON_GetObjectItem(json, "uncorp_tcp_head")->valueint;
     UNCORP_TCP_TAIL = cJSON_GetObjectItem(json, "uncorp_tcp_tail")->valueint;
 
-    const char *ip = cJSON_GetObjectItem(json, "server_ip")->valuestring;
-    strncpy(SERVER_IP, ip, sizeof(SERVER_IP) - 1);
+    const char *c_ip = cJSON_GetObjectItem(json, "client_ip")->valuestring;
+    strncpy(CLIENT_IP, c_ip, sizeof(CLIENT_IP) - 1);
+    CLIENT_IP[sizeof(CLIENT_IP) - 1] = '\0';
+
+    const char *s_ip = cJSON_GetObjectItem(json, "server_ip")->valuestring;
+    strncpy(SERVER_IP, s_ip, sizeof(SERVER_IP) - 1);
     SERVER_IP[sizeof(SERVER_IP) - 1] = '\0';
 
     UDP_SIZE = cJSON_GetObjectItem(json, "udp_payload_size")->valueint;
